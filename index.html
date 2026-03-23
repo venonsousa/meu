@@ -2,81 +2,390 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Player de Rádio</title>
   <style>
-    .radio-player {
-      background: #222;
+    * { box-sizing: border-box; }
+    
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #000;
       color: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      width: 320px;
-      text-align: center;
-      font-family: Arial, sans-serif;
     }
+    
+    .radio-player {
+      padding: 20px;
+      width: 100%;
+      min-height: 100vh;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      position: relative;
+      transition: background-image 0.5s ease;
+    }
+    
+    .radio-player::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(20,20,40,0.9) 100%);
+      z-index: 0;
+    }
+    
+    .radio-content {
+      position: relative;
+      z-index: 1;
+      max-width: 500px;
+      width: 90%;
+      padding: 25px;
+      background: rgba(30, 30, 50, 0.7);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .radio-logo {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #fff;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .radio-logo span {
+      color: #4caf50;
+    }
+    
     audio {
       width: 100%;
-      margin-bottom: 10px;
+      margin: 15px 0;
+      border-radius: 8px;
+      outline: none;
     }
-    #track-info {
-      margin-top: 10px;
-      font-weight: bold;
+    
+    /* Personalização do player de áudio */
+    audio::-webkit-media-controls-panel {
+      background-color: rgba(255,255,255,0.1);
+    }
+    
+    #artist {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 15px 0 5px;
+      color: #fff;
+      min-height: 28px;
+    }
+    
+    #song {
       font-size: 16px;
+      margin: 5px 0;
+      color: #e0e0e0;
+      min-height: 22px;
     }
+    
     #album-info {
-      margin-top: 5px;
+      margin-top: 12px;
       font-size: 14px;
-      color: #ccc;
+      color: #aaa;
+      min-height: 20px;
+    }
+    
+    .play-hint {
+      font-size: 13px;
+      color: #888;
+      margin-top: 15px;
+      font-style: italic;
+      opacity: 0.9;
+    }
+    
+    .status {
+      font-size: 12px;
+      margin-top: 8px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      display: inline-block;
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .status.live { color: #4caf50; }
+    .status.buffering { color: #ff9800; }
+    .status.error { color: #f44336; }
+    .status.idle { color: #888; }
+    
+    .loading {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #4caf50;
+      animation: spin 1s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 600px) {
+      .radio-content {
+        padding: 20px 15px;
+        margin: 10px;
+      }
+      #artist { font-size: 18px; }
+      #song { font-size: 15px; }
+      .radio-logo { font-size: 20px; }
     }
   </style>
 </head>
 <body>
-  <div class="radio-player">
-    <audio id="radio" controls autoplay>
-      <source src="https://s01.svrdedicado.org:7956/;" type="audio/mpeg">
-      Seu navegador não suporta áudio HTML5.
-    </audio>
-    <div id="track-info">
-      <div id="artist">Carregando artista...</div>
-      <div id="song">Carregando música...</div>
+  <div class="radio-player" id="player-bg">
+    <div class="radio-content">
+      <div class="radio-logo">📻 Rádio <span>Online</span></div>
+      
+      <audio id="radio" controls preload="none">
+        <source src="https://s01.svrdedicado.org:7956/stream" type="audio/mpeg">
+        Seu navegador não suporta reprodução de áudio HTML5.
+      </audio>
+      
+      <div id="artist">Aguardando reprodução...</div>
+      <div id="song">Clique em play para iniciar</div>
+      <div id="album-info">Álbum: —</div>
+      
+      <div class="play-hint" id="play-hint">💡 Dica: Navegadores modernos exigem interação para iniciar o áudio</div>
+      <div class="status idle" id="connection-status">⏸️ Aguardando</div>
     </div>
-    <div id="album-info">Carregando álbum...</div>
   </div>
 
   <script>
-    async function atualizarMusica() {
-      try {
-        // Consulta a API da rádio
-        const response = await fetch("https://vox.svrdedicado.org/api/g1.Y1to5YdrG8DB-lJjbjRYzcNybhAwZZZ7CkWkxgnq5iU");
-        const data = await response.json();
+    (function() {
+      'use strict';
+      
+      // ✅ CONFIGURAÇÕES PRINCIPAIS
+      const CONFIG = {
+        streamUrl: "https://s01.svrdedicado.org:7956/stream",
+        metadataApi: "https://vox.svrdedicado.org/api/g1.Y1to5YdrG8DB-lJjbjRYzcNybhAwZZZ7CkWkxgnq5iU",
+        itunesApi: "https://itunes.apple.com/search",
+        updateInterval: 15000, // 15 segundos
+        country: "BR"
+      };
 
-        // Exemplo: "Artista - Música"
-        const titulo = data.objects[0].content;
-        const partes = titulo.split(" - ");
-        const artista = partes[0] || "Desconhecido";
-        const musica = partes[1] || "Desconhecida";
+      // Elementos do DOM
+      const elements = {
+        radio: document.getElementById('radio'),
+        artist: document.getElementById('artist'),
+        song: document.getElementById('song'),
+        album: document.getElementById('album-info'),
+        playerBg: document.getElementById('player-bg'),
+        playHint: document.getElementById('play-hint'),
+        status: document.getElementById('connection-status')
+      };
 
-        document.getElementById("artist").innerText = artista;
-        document.getElementById("song").innerText = musica;
+      // Estado atual
+      let currentSong = null;
+      let updateTimer = null;
 
-        // Buscar álbum online (exemplo usando API do iTunes)
-        const busca = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artista + " " + musica)}&entity=song&limit=1`);
-        const resultado = await busca.json();
+      // ✅ Inicialização
+      function init() {
+        // Configura URL do stream (sem espaços ou caracteres inválidos)
+        const source = elements.radio.querySelector('source');
+        source.src = CONFIG.streamUrl.trim();
+        elements.radio.load();
 
-        if (resultado.results.length > 0) {
-          document.getElementById("album-info").innerText = "Álbum: " + resultado.results[0].collectionName;
-        } else {
-          document.getElementById("album-info").innerText = "Álbum não encontrado.";
-        }
-      } catch (error) {
-        document.getElementById("artist").innerText = "Erro ao carregar artista.";
-        document.getElementById("song").innerText = "Erro ao carregar música.";
-        document.getElementById("album-info").innerText = "Erro ao carregar álbum.";
+        // Eventos do player de áudio
+        setupAudioEvents();
+        
+        // Inicia atualização de metadados
+        startMetadataUpdates();
+        
+        console.log("🎧 Player de Rádio inicializado");
       }
-    }
 
-    // Atualiza a cada 10 segundos
-    setInterval(atualizarMusica, 10000);
-    atualizarMusica();
+      // ✅ Configura eventos do áudio
+      function setupAudioEvents() {
+        elements.radio.addEventListener('play', () => {
+          elements.playHint.style.display = 'none';
+          updateStatus('🔗 Conectando...', 'buffering');
+        });
+
+        elements.radio.addEventListener('playing', () => {
+          updateStatus('🔴 Ao vivo', 'live');
+        });
+
+        elements.radio.addEventListener('waiting', () => {
+          updateStatus('⏳ Buffering...', 'buffering');
+        });
+
+        elements.radio.addEventListener('stalled', () => {
+          updateStatus('🔄 Reconectando...', 'buffering');
+        });
+
+        elements.radio.addEventListener('error', (e) => {
+          console.error("❌ Erro no stream:", e);
+          updateStatus('❌ Erro de conexão', 'error');
+        });
+
+        elements.radio.addEventListener('pause', () => {
+          if (elements.radio.paused) {
+            updateStatus('⏸️ Pausado', 'idle');
+          }
+        });
+      }
+
+      // ✅ Atualiza indicador de status
+      function updateStatus(message, type) {
+        elements.status.textContent = message;
+        elements.status.className = `status ${type}`;
+      }
+
+      // ✅ Inicia loop de atualização de metadados
+      function startMetadataUpdates() {
+        // Primeira atualização após 2 segundos
+        setTimeout(fetchMetadata, 2000);
+        
+        // Atualizações periódicas
+        updateTimer = setInterval(fetchMetadata, CONFIG.updateInterval);
+      }
+
+      // ✅ Busca e atualiza metadados da música
+      async function fetchMetadata() {
+        try {
+          // 1. Busca metadados da API da rádio
+          const data = await fetchRadioMetadata();
+          if (!data) return;
+
+          // 2. Processa artista e música
+          const { artista, musica } = parseTrackTitle(data.content);
+          
+          // 3. Atualiza interface
+          elements.artist.textContent = artista;
+          elements.song.textContent = musica;
+
+          // 4. Busca capa do álbum (apenas se mudou a música)
+          const trackKey = `${artista}|${musica}`;
+          if (trackKey !== currentSong) {
+            currentSong = trackKey;
+            await fetchAlbumArt(artista, musica);
+          }
+
+        } catch (error) {
+          console.warn("⚠️ Erro ao atualizar metadados:", error.message);
+          // Mantém dados anteriores em caso de erro temporário
+        }
+      }
+
+      // ✅ Fetch com timeout e tratamento de erros
+      async function fetchWithTimeout(url, timeout = 8000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        
+        try {
+          const response = await fetch(url, { 
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+          });
+          clearTimeout(timer);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return await response.json();
+        } catch (error) {
+          clearTimeout(timer);
+          if (error.name === 'AbortError') {
+            throw new Error('Timeout na requisição');
+          }
+          throw error;
+        }
+      }
+
+      // ✅ Busca metadados da API da rádio
+      async function fetchRadioMetadata() {
+        const data = await fetchWithTimeout(CONFIG.metadataApi);
+        
+        if (!data?.objects || !Array.isArray(data.objects) || data.objects.length === 0) {
+          throw new Error('Resposta da API inválida');
+        }
+        
+        const content = data.objects[0].content;
+        if (!content || typeof content !== 'string') {
+          throw new Error('Conteúdo inválido na resposta');
+        }
+        
+        return { content: content.trim() };
+      }
+
+      // ✅ Parse do título "Artista - Música"
+      function parseTrackTitle(title) {
+        if (!title) return { artista: 'Desconhecido', musica: 'Desconhecida' };
+        
+        const parts = title.split(' - ');
+        const artista = parts[0]?.trim() || 'Desconhecido';
+        // Suporta títulos com múltiplos " - " (ex: "Artista - Música - Remix")
+        const musica = parts.length > 1 
+          ? parts.slice(1).join(' - ').trim() 
+          : 'Desconhecida';
+          
+        return { artista, musica };
+      }
+
+      // ✅ Busca capa do álbum na iTunes API
+      async function fetchAlbumArt(artista, musica) {
+        try {
+          const termo = encodeURIComponent(`${artista} ${musica}`.trim());
+          const url = `${CONFIG.itunesApi}?term=${termo}&entity=song&limit=1&country=${CONFIG.country}`;
+          
+          const resultado = await fetchWithTimeout(url, 5000);
+          
+          if (resultado?.results?.length > 0) {
+            const item = resultado.results[0];
+            const album = item.collectionName || 'Álbum desconhecido';
+            const capa = item.artworkUrl100?.replace('100x100bb', '600x600bb');
+            
+            elements.album.textContent = `Álbum: ${album}`;
+            
+            if (capa) {
+              // Pré-carrega imagem antes de aplicar
+              const img = new Image();
+              img.onload = () => {
+                elements.playerBg.style.backgroundImage = `url('${capa}')`;
+              };
+              img.onerror = () => {
+                elements.playerBg.style.backgroundImage = 'none';
+              };
+              img.src = capa;
+            }
+          }
+        } catch (error) {
+          console.warn("⚠️ Erro ao buscar capa:", error.message);
+          elements.album.textContent = 'Álbum: —';
+        }
+      }
+
+      // ✅ Limpeza ao fechar página
+      window.addEventListener('beforeunload', () => {
+        if (updateTimer) clearInterval(updateTimer);
+        if (elements.radio) {
+          elements.radio.pause();
+          elements.radio.src = '';
+        }
+      });
+
+      // ✅ Inicia quando DOM estiver pronto
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
   </script>
 </body>
 </html>
