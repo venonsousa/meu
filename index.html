@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Player de Rádio</title>
+  <style>
+    .radio-player {
+      background: #222;
+      color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      width: 320px;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+    audio {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    #track-info {
+      margin-top: 10px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    #album-info {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="radio-player">
+    <audio id="radio" controls autoplay>
+      <source src="https://s01.svrdedicado.org:7956/;" type="audio/mpeg">
+      Seu navegador não suporta áudio HTML5.
+    </audio>
+    <div id="track-info">
+      <div id="artist">Carregando artista...</div>
+      <div id="song">Carregando música...</div>
+    </div>
+    <div id="album-info">Carregando álbum...</div>
+  </div>
+
+  <script>
+    async function atualizarMusica() {
+      try {
+        // Consulta a API da rádio
+        const response = await fetch("https://vox.svrdedicado.org/api/g1.Y1to5YdrG8DB-lJjbjRYzcNybhAwZZZ7CkWkxgnq5iU");
+        const data = await response.json();
+
+        // Exemplo: "Artista - Música"
+        const titulo = data.objects[0].content;
+        const partes = titulo.split(" - ");
+        const artista = partes[0] || "Desconhecido";
+        const musica = partes[1] || "Desconhecida";
+
+        document.getElementById("artist").innerText = artista;
+        document.getElementById("song").innerText = musica;
+
+        // Buscar álbum online (exemplo usando API do iTunes)
+        const busca = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artista + " " + musica)}&entity=song&limit=1`);
+        const resultado = await busca.json();
+
+        if (resultado.results.length > 0) {
+          document.getElementById("album-info").innerText = "Álbum: " + resultado.results[0].collectionName;
+        } else {
+          document.getElementById("album-info").innerText = "Álbum não encontrado.";
+        }
+      } catch (error) {
+        document.getElementById("artist").innerText = "Erro ao carregar artista.";
+        document.getElementById("song").innerText = "Erro ao carregar música.";
+        document.getElementById("album-info").innerText = "Erro ao carregar álbum.";
+      }
+    }
+
+    // Atualiza a cada 10 segundos
+    setInterval(atualizarMusica, 10000);
+    atualizarMusica();
+  </script>
+</body>
+</html>
